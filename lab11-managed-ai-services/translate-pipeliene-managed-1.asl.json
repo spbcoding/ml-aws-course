@@ -1,0 +1,97 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Pass",
+  "States": {
+    "Pass": {
+      "Type": "Pass",
+      "Next": "StartTranscriptionJob",
+      "Parameters": {
+        "Input": {
+          "Bucket.$": "$.Bucket",
+          "Key.$": "$.Key",
+          "S3Path.$": "$.S3Path",
+          "JobId.$": "$.JobId",
+          "TranscriptionKey.$": "States.Format('{}.transcription-{}.json', $.Key, $.JobId)"
+        }
+      }
+    },
+    "StartTranscriptionJob": {
+      "Type": "Task",
+      "Parameters": {
+        "IdentifyLanguage": true,
+        "Media": {
+          "MediaFileUri.$": "$.Input.S3Path"
+        },
+        "TranscriptionJobName.$": "$.Input.JobId",
+        "OutputBucketName.$": "$.Input.Bucket",
+        "OutputKey.$": "$.Input.TranscriptionKey"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:transcribe:startTranscriptionJob",
+      "Next": "Wait",
+      "ResultPath": "$.TranscriptionJob"
+    },
+    "Wait": {
+      "Type": "Wait",
+      "Seconds": 10,
+      "Next": "GetTranscriptionJob",
+      "Comment": "Wait for 10 seconds"
+    },
+    "GetTranscriptionJob": {
+      "Type": "Task",
+      "Parameters": {
+        "TranscriptionJobName.$": "$.TranscriptionJob.TranscriptionJobName"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:transcribe:getTranscriptionJob",
+      "Next": "Choice",
+      "ResultPath": "$.TranscriptionJobResult",
+      "InputPath": "$.TranscriptionJob"
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.TranscriptionJobResult.TranscriptionJob.TranscriptionJobStatus",
+          "StringEquals": "COMPLETED",
+          "Comment": "COMPLETED",
+          "Next": "GetObject"
+        },
+        {
+          "Variable": "$.TranscriptionJobResult.TranscriptionJob.TranscriptionJobStatus",
+          "StringEquals": "FAILED",
+          "Comment": "FAILED",
+          "Next": "Fail"
+        }
+      ],
+      "Default": "Wait"
+    },
+    "GetObject": {
+      "Type": "Task",
+      "Next": "Get Transcription Decoded Body",
+      "Parameters": {
+        "Bucket.$": "$.Input.Bucket",
+        "Key.$": "$.Input.TranscriptionKey"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject"
+    },
+    "Get Transcription Decoded Body": {
+      "Type": "Pass",
+      "Next": "Get Transcript",
+      "Parameters": {
+        "TranscriptionBody.$": "States.StringToJson($.Body)"
+      }
+    },
+    "Get Transcript": {
+      "Type": "Pass",
+      "Next": "Success",
+      "Parameters": {
+        "Transcript.$": "$.TranscriptionBody.results.transcripts[0].transcript"
+      }
+    },
+    "Success": {
+      "Type": "Succeed"
+    },
+    "Fail": {
+      "Type": "Fail"
+    }
+  }
+}
