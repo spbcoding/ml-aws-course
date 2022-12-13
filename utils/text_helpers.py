@@ -22,7 +22,8 @@ def count_corpus(tokens):  # @save
 def tokenize(lines, token='word'):  # @save
     """Split text lines into word or character tokens."""
     if token == 'word':
-        return [line.split() for line in lines]
+        #return [line.split() for line in lines]
+        return [ (word + ' ') for line in lines for word in line.split()]
     elif token == 'char':
         return [list(line) for line in lines]
     else:
@@ -33,17 +34,27 @@ def read_file(input_file):  # @save
     """Load the time machine dataset into a list of text lines."""
     with open(input_file, 'r') as f:
         lines = f.readlines()
-    return [re.sub('[^A-Za-z]+', ' ', line).strip().lower() for line in lines]
+
+    return [ch for line in lines for ch in list(line) if ch not in ('"') ]
+    #return [re.sub('[^A-Za-z]+', ' ', line).strip().lower() for line in lines]
 
 
-def load_corpus(input_file, max_tokens=-1):  # @save
+def load_corpus(input_file, token_type = 'char', max_tokens=-1):  # @save
     """Return token indices and the vocabulary of the time machine dataset."""
     lines = read_file(input_file)
-    tokens = tokenize(lines, 'char')
+    tokens = tokenize(lines, token = token_type)
     vocab = Vocab(tokens)
     # Since each text line in the time machine dataset is not necessarily a
     # sentence or a paragraph, flatten all the text lines into a single list
-    corpus = [token for line in tokens for token in line]
+
+    if token_type == 'word':
+        #return [line.split() for line in lines]
+        corpus = [ (word + ' ') for line in lines for word in line.split()]
+    elif token_type == 'char':
+        corpus = [token for line in tokens for token in line]
+    else:
+        print('ERROR: unknown token type: ' + token_type)
+
     # when need to get decoded corpus:
     #corpus = [vocab[token] for line in tokens for token in line]
 
